@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> Hw1 - Jillian Beck - JLB574 </title>
+    <p> JLB574</p>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            background-color: white;
+            margin: 0;
+            padding: 0;
+        }
+
+        svg { 
+            background: whitesmoke;
+
+        }
+
+        #linegraph {
+            margin-bottom: 30px;
+            
+        }
+        .neighborhood {
+            stroke: #ffffff;
+            stroke-width: .5px;
+        }
+        .legend {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-left: 30px;
+        }
+        .legend div {
+            margin-left: 10px;
+            width: 60px;
+            height: 15px;
+            padding: 15px;
+        }
+
+        .all-graphs {
+            display: flex;
+            flex-direction: column;
+            margin-left: 300px;
+        }
+
+        .first-container {
+            display: flex; 
+            flex-direction: row;
+            margin-bottom: 30px;
+        }
+
+        .first-paragraph {
+            text-align: left;
+            justify-content: center;
+            line-height: 2;
+            width: 900px;
+            margin-bottom: 30px;
+
+        }
+
+        .second-paragraph {
+            text-align: left;
+            justify-content: center;
+            line-height: 2;
+            width: 900px;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+
+<h2> <b> A Glimpse into San Francisco's Tree Planting Timeline </b></h2>
+
+<div class="all-graphs">
+    <div class = "first-paragraph"> 
+        <h3> SF Neighborhoods by Average Tree Age </h3>
+        <p> By breaking San Francisco down into its many neighborhoods, we can sum and average the ages of all the trees measured in our dataset. This provides us with a clear visual of where old and new replanting efforts have been focused. The lighter colored neighborhoods mark younger trees and thus newer replanting habits. The darker colored ones show the opposite.</p>
+    </div>
+    <div class = "first-container"> 
+    <svg id="graph" width="900" height="900"></svg>
+    
+    <div class="legend">
+        <p>Youngest Tree Age </p>
+        <div style="background: #E3C39D;">0-10</div>
+        <div style="background: #C9A27C;">11-20</div>
+        <div style="background: #A97D56;">21-30</div>
+        <div style="background: #8B5A2B;">31-40</div>
+        <div style="background: #5C3D1E;">41+</div>
+        <p>Oldest Tree Age</p>
+    </div>
+    </div>
+    <div class = "second-paragraph"> 
+        <h3> Amount of Trees Planted Across the Years </h3>
+        <p> Within our choropleth map, we saw that only a few SF neighborhoods had average tree ages above 31+ years. I wanted to dive into this further by examining the amount of tree planting initiatives across the decades. Looking at our line graph, we can see there is a huge boom in tree planting from 2005-2010 (which lines up with our map), and a huge drop after 2020. Older trees tend to be more draught resistant than younger ones, and more efficient with CO2 absorption. This suggests that the SF community should begin replanting efforts soon, in the hopes of building an overall more resilient community in the future when climate change exacerbates weather conditions. </p>
+    </div>
+    <svg id="linegraph" width="800" height="800"></svg>
+
+</div>
+
+
+
+<script>
+    //map svg
+    const svg = d3.select("#graph");
+
+    //loading in DATAAAAA
+    d3.json("SF-Neighborhoods.geo.json").then(topology => {
+        const map = topojson.feature(topology, topology.objects[Object.keys(topology.objects)[0]]);
+        console.log("Converted GeoJSON:", map);
+
+        const projection = d3.geoMercator()
+            .scale(210000)  //zooming in wtih the scale
+            .center([-122.4194, 37.7749]) //i just googled the center of san fran and got the center co-ordinates (https://www.latlong.net/place/san-francisco-ca-usa-594.html)
+            .translate([500, 400]);
+
+        const pathGenerator = d3.geoPath().projection(projection);
+
+        //loading in the Filtered CSV file
+        d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv").then(data => {
+            console.log("CSV loaded:", data.length, "trees");
+
+            
+            const currentYear = new Date().getFullYear();
+
+            //getting the exact year from the PlantDate column which is currently formatted like day/month/yera
+            const treeCountsByYear = {};
+
+            data.forEach(d => {
+                let year = null;
+                if (d.PlantDate) {
+                    const dateParts = d.PlantDate.split("/");
+                    if (dateParts.length === 3) {
+                        let twoDigitYear = parseInt(dateParts[2]);
+                        year = twoDigitYear < 30 ? 2000 + twoDigitYear : 1900 + twoDigitYear;
+                    }
+                }
+                d.Year = year;
+                d.TreeAge = year ? currentYear - year : null;
+                d.Longitude = parseFloat(d.Longitude);
+                d.Latitude = parseFloat(d.Latitude);
+
+                if (year && year > 1900 && year <= currentYear) {
+                    treeCountsByYear[year] = (treeCountsByYear[year] || 0) + 1;
+                }
+            });
+
+            console.log("year:", treeCountsByYear);
+
+            const treeData = Object.entries(treeCountsByYear)
+                .map(([year, count]) => ({ year: +year, count: count }))
+                .sort((a, b) => a.year - b.year);
+
+            console.log("planting:", treeData);
+
+
+            //removing any null dates
+            data = data.filter(d => !isNaN(d.Longitude) && !isNaN(d.Latitude) && d.TreeAge !== null);
+
+            //trying to sum and then average the number of trees in each neighborhood to make categories for the color of the neighborhoods
+            const neighborhoodAges = {};
+            map.features.forEach(feature => {
+                const name = feature.properties.name;
+                const treesInNeighborhood = data.filter(d => d3.geoContains(feature, [d.Longitude, d.Latitude]));
+
+                if (treesInNeighborhood.length > 0) {
+                    const avgAge = d3.mean(treesInNeighborhood, d => d.TreeAge);
+                    neighborhoodAges[name] = avgAge;
+                } else {
+                    neighborhoodAges[name] = null;
+                }
+            });
+
+            console.log("Neighborhood Age Data:", neighborhoodAges);
+
+            //adding landmarks to put some context on the map per the profs suggestion. Chose six famous places in SF based off a tourist guide and then located the co-ordinates of each using Google Earth
+            const places = [
+                { name: "Lombard Street", coords: [-122.41951498777978, 37.802145030046546] },
+                { name: "Alcatraz", coords: [-122.4229700804612, 37.82701612284238] },
+                { name: "Fisherman's Wharf", coords: [-122.41577236079335, 37.80858794837306] },
+                { name: "Oracle Park", coords: [-122.38921680312325, 37.778549250584334] },
+                { name: "Union Square", coords: [-122.4075054091976, 37.78798012722897] },
+                { name: "San Francisco Zoo", coords: [-122.5024401231984, 37.734958759339065]},
+                { name: "Twin Peaks", coords: [-122.4475266534538, 37.753370399005405]},
+                { name: "John McLaren Park", coords: [-122.41839372756505, 37.72043616720847]}
+            ];
+            // Ensure that the color scale covers a realistic range of tree ages
+            const ages = Object.values(neighborhoodAges).filter(v => v !== null);
+            const ageExtent = d3.extent(ages);
+
+            //making color scale with Quantize so that it will make the different categories for me
+            const colorScale = d3.scaleQuantize()
+                .domain([ageExtent[0], ageExtent[1]]) 
+                .range(["#F0D5A8", "#D2A679", "#B98358", "#8F5E38", "#5C3D1E"]); //setting a color range of brown colors from light for youngest to dark brown for oldest
+                //used color-hex to find the color scheme: https://www.color-hex.com/color-palette/115558
+            
+            //making geojson map
+            svg.selectAll(".neighborhood")
+                .data(map.features)
+                .enter().append("path")
+                .attr("class", "neighborhood")
+                .attr("d", pathGenerator)
+                .attr("fill", d => colorScale(neighborhoodAges[d.properties.name]))
+                .attr("stroke", "#000000");
+
+            //adding the landmark dots to the graph for context
+            svg.selectAll(".places")
+                .data(places)
+                .enter().append("circle")
+                .attr("class", "places")
+                .attr("cx", d => projection(d.coords)[0])
+                .attr("cy", d => projection(d.coords)[1])
+                .attr("r", 3) 
+                .attr("fill", "Green");  //making color green to play on the brown of the map
+
+            svg.selectAll(".point-label")
+                .data(places)
+                .enter().append("text")
+                .attr("class", "point-label")
+                .text(d => d.name)
+                .attr("x", d => projection(d.coords)[0]+ 8)
+                .attr("y", d => projection(d.coords)[1] + 7)  //shifting label to be a bit below the actual point
+                .attr("font-size", "12px")
+                .attr("fill", "black")
+                .attr("font-weight", "bold");
+
+            //Creating line graph to show the distribution of planting initiatives throughout the years
+           
+            const svgLine = d3.select("#linegraph")
+            const margin = {top: 50, right: 50, bottom: 50, left: 50};
+            const width = +svgLine.attr("width") - margin.left - margin.right;
+            const height = +svgLine.attr("height") - margin.top - margin.bottom;
+            
+            const chartArea = svgLine.append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            //making our x and y scales using the classic ScaleLinear (code referenced from here: https://d3js.org/d3-scale/linear)
+            const xScale = d3.scaleLinear()
+                .domain(d3.extent(treeData, d => d.year))
+                .range([0, width]);
+
+            const yScale = d3.scaleLinear()
+                .domain([0, d3.max(treeData, d => d.count) || 10])
+                .range([height, 0]); //flipping to fix values and make em higher
+
+            // creating the axes for the lovely line graph
+            const xAxis = d3.axisBottom(xScale).tickFormat(d3.format("d")); //modeled axes creation from here: https://d3js.org/d3-axis
+            const yAxis = d3.axisLeft(yScale);          
+
+            //now to making the X axis
+            chartArea.append("g")
+                .attr("transform", `translate(0,${height})`)
+                .call(xAxis)
+                .append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("fill", "black")
+                .attr("font-size", "14px")
+                .text("Planting Year");
+
+            //making y axis
+            chartArea.append("g")
+                .call(yAxis)
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -height / 2)
+                .attr("y", -50)
+                .attr("fill", "black")
+                .attr("font-size", "14px")
+                .text("Number of Trees Planted");
+
+            //now we need to make an actual line and the dots for the graphs
+
+            //creating the line
+            const line = d3.line()
+                .x(d => xScale(d.year))
+                .y(d => yScale(d.count)) //getting number of trees
+                .curve(d3.curveMonotoneX); //using curveMonotoneX becuase it will connect the data without any strange oscillations, referenced this: https://d3js.org/d3-shape/curve#curveMonotoneX
+
+            chartArea.append("path")
+                .datum(treeData)
+                .attr("fill", "none")
+                .attr("stroke", "green") //gonna make green so that we maintain this green and brown vibe 
+                .attr("stroke-width", 2)
+                .attr("d", line);
+
+            //LAST but not least - adding the circles!!
+            chartArea.selectAll("circle")
+                .data(treeData)
+                .enter().append("circle")
+                .attr("cx", d => xScale(d.year))
+                .attr("cy", d => yScale(d.count))
+                .attr("r", 4)
+                .attr("fill", "#5C3D1E");
+
+        })
+    })
+
+</script>
+
+
+</body>
+</html>
+
+
+
+
