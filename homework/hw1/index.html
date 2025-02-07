@@ -189,7 +189,7 @@
                 { name: "Twin Peaks", coords: [-122.4475266534538, 37.753370399005405]},
                 { name: "John McLaren Park", coords: [-122.41839372756505, 37.72043616720847]}
             ];
-            // Ensure that the color scale covers a realistic range of tree ages
+            //filtering out any sus values
             const ages = Object.values(neighborhoodAges).filter(v => v !== null);
             const ageExtent = d3.extent(ages);
 
