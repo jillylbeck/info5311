@@ -74,7 +74,7 @@
 </head>
 <body>
 
-<h2> <b> A Glimpse into San Francisco's Tree Planting Timeline </b></h2>
+<h2> <b> A Glimpse into San Francisco's Tree RePlanting Efforts </b></h2>
 
 <div class="all-graphs">
     <div class = "first-paragraph"> 
@@ -124,12 +124,12 @@
         d3.csv("Street_Tree_List-2022-01-30_FILTERED.csv").then(data => {
             console.log("CSV loaded:", data.length, "trees");
 
-            
+            //getting the exact year from the PlantDate column which is currently formatted like day/month/yera
+
             const currentYear = new Date().getFullYear();
 
-            //getting the exact year from the PlantDate column which is currently formatted like day/month/yera
             const treeCountsByYear = {};
-
+            //getting the actualy AGE of the tree   
             data.forEach(d => {
                 let year = null;
                 if (d.PlantDate) {
