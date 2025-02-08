@@ -10,7 +10,6 @@
 
     <style>
         body { 
-            font-family: Arial, sans-serif; 
             text-align: center; 
             background-color: white;
             margin: 0;
@@ -24,7 +23,7 @@
 
         #linegraph {
             margin-bottom: 30px;
-            
+            padding-left: 30px;            
         }
         .neighborhood {
             stroke: #ffffff;
@@ -99,7 +98,7 @@
         <h3> Amount of Trees Planted Across the Years </h3>
         <p> Within our choropleth map, we saw that only a few SF neighborhoods had average tree ages above 31+ years. I wanted to dive into this further by examining the amount of tree planting initiatives across the decades. Looking at our line graph, we can see there is a huge boom in tree planting from 2005-2010 (which lines up with our map), and a huge drop after 2020. Older trees tend to be more draught resistant than younger ones, and more efficient with CO2 absorption. This suggests that the SF community should begin replanting efforts soon, in the hopes of building an overall more resilient community in the future when climate change exacerbates weather conditions. </p>
     </div>
-    <svg id="linegraph" width="800" height="800"></svg>
+    <svg id="linegraph" width="900" height="800"></svg>
 
 </div>
 
@@ -187,17 +186,22 @@
                 { name: "Union Square", coords: [-122.4075054091976, 37.78798012722897] },
                 { name: "San Francisco Zoo", coords: [-122.5024401231984, 37.734958759339065]},
                 { name: "Twin Peaks", coords: [-122.4475266534538, 37.753370399005405]},
-                { name: "John McLaren Park", coords: [-122.41839372756505, 37.72043616720847]}
+                { name: "John McLaren Park", coords: [-122.41839372756505, 37.72043616720847]},
+                { name: "Golden Gate Park", coords: [-122.483519, 37.76904]}
             ];
             //filtering out any sus values
             const ages = Object.values(neighborhoodAges).filter(v => v !== null);
             const ageExtent = d3.extent(ages);
 
             //making color scale with Quantize so that it will make the different categories for me
-            const colorScale = d3.scaleQuantize()
-                .domain([ageExtent[0], ageExtent[1]]) 
-                .range(["#F0D5A8", "#D2A679", "#B98358", "#8F5E38", "#5C3D1E"]); //setting a color range of brown colors from light for youngest to dark brown for oldest
+           // const colorScale = d3.scaleQuantize()
+           //     .domain([ageExtent[0], ageExtent[1]]) 
+           //     .range(["#F0D5A8", "#D2A679", "#B98358", "#8F5E38", "#5C3D1E"]); //setting a color range of brown colors from light for youngest to dark brown for oldest
                 //used color-hex to find the color scheme: https://www.color-hex.com/color-palette/115558
+
+            const colorScale = d3.scaleThreshold() //decided to use scaleThreshold instead of quantize because otherwise, it was taking values of the lowest bracket and was not mathcing the legend 
+                .domain([10, 20, 30, 40, 50]) //making brackets map the legend
+                .range(["#E3C39D", "#C9A27C", "#A97D56", "#8B5A2B", "#5C3D1E"]); //slightly modified pallette also from here: https://www.color-hex.com/color-palette/115558
             
             //making geojson map
             svg.selectAll(".neighborhood")
@@ -205,8 +209,11 @@
                 .enter().append("path")
                 .attr("class", "neighborhood")
                 .attr("d", pathGenerator)
-                .attr("fill", d => colorScale(neighborhoodAges[d.properties.name]))
-                .attr("stroke", "#000000");
+                .attr("fill", d => 
+                    neighborhoodAges[d.properties.name] !== null 
+                    ? colorScale(neighborhoodAges[d.properties.name]) 
+                    : "whitesmoke" ) //making the undefined/null parts of the svg the same color as the grey background, this will leave them off the map. 
+                .attr("stroke", "#000000")
 
             //adding the landmark dots to the graph for context
             svg.selectAll(".places")
@@ -269,7 +276,7 @@
                 .append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("x", -height / 2)
-                .attr("y", -50)
+                .attr("y", -40) //keeping y axis label within the svg frame
                 .attr("fill", "black")
                 .attr("font-size", "14px")
                 .text("Number of Trees Planted");
